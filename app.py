@@ -81,6 +81,13 @@ def parse_bilibili_video(url: str):
         if author_meta and author_meta.get("content"):
             author = author_meta["content"].strip()
             logger.debug(f"Meta作者：{author}")
+         # UP主兜底
+        if author == "未知UP主":
+            up_div = safe_find(soup, name="div", attrs={"class": "up-detail-top"})
+            up_a = safe_find(up_div, name="a")
+            if up_a and up_a.get_text():
+                author = up_a.get_text(strip=True)
+                logger.debug(f"层级标签UP主：{author}")
         
         # ===== 5. 提取年份 =====
         year = "n.d."
