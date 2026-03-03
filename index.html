@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 基础favicon配置 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>APA引文生成工具</title>
+    <!-- 引入Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- 引入Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <!-- 引入Vue 3 -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+    <style>
+        /* 自定义引文结果样式 */
+        .citation-result {
+            background-color: #f8f9fa;
+            border-left: 4px solid #0d6efd;
+            padding: 1.25rem;
+            border-radius: 0.5rem;
+            font-family: "Times New Roman", Times, serif;
+            font-size: 1rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        /* 复制按钮hover效果 */
+        .copy-btn {
+            transition: all 0.2s ease;
+        }
+        .copy-btn:hover {
+            background-color: #0d6efd !important;
+            color: white !important;
+        }
+        /* 表单卡片样式优化 */
+        .form-card {
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+            border: none;
+            border-radius: 0.75rem;
+        }
+        /* 按钮图标间距优化 */
+        .btn i {
+            margin-right: 0.5rem;
+        }
+        /* 加载状态样式 */
+        .loading {
+            cursor: wait;
+            opacity: 0.8;
+        }
+         /* 新增：双栏布局样式 */
+        .info-panel {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.05);
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        /* 新增：上下排列的信息区块分隔样式 */
+        .info-section {
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e9ecef;
+            margin-bottom: 0.5rem;
+        }
+        .info-section:last-child {
+            border-bottom: none;
+            margin-bottom: 0;
+            padding-bottom: 0;
+        }
+        .instruction-col {
+            border-right: 1px solid #e9ecef; /* 分隔线 */
+        }
+        /* 响应式适配：手机端隐藏分隔线，堆叠显示 */
+        @media (max-width: 768px) {
+            .instruction-col {
+                border-right: none;
+                border-bottom: 1px solid #e9ecef;
+                padding-bottom: 1rem;
+                margin-bottom: 1rem;
+            }
+        }
+    </style>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon">
+</head>
+<body class="bg-light min-vh-50 d-flex flex-column justify-content-center p-4">
+    <div class="container" id="app">
+        <div class=" row ">
+            <!-- 左侧：上下排列的说明栏+项目信息栏 -->
+            <div class="col-lg-3 col-md-4 info-panel-col ms-md-n2">
+                <div class="info-panel">
+                    <!-- 上：工具使用说明栏 -->
+                    <div class="info-section">
+                        <h5 class="text-primary mb-2"><i class="bi bi-info-circle"></i> 工具使用说明</h5>
+                        <ul class="text-muted mb-0" style="font-size: 0.9rem; line-height: 1.6;">
+                            <li>支持书籍、期刊、网页/B站视频的APA 7th格式引文生成</li>
+                            <li>无出版年份时请填写 <code>n.d.</code>（no date）</li>
+                            <li>生成结果可直接复制用于格式文章参考文献</li>
+                            <li>B站链接解析会自动填充作者、年份、标题信息</li>
+                            <li>b站链接自动填写内容，仅限于本地安装，线上不可用</li>
+                        </ul>
+                    </div>
+                    <!-- 下：项目信息栏 -->
+                    <div class="info-section">
+                        <h5 class="text-secondary mb-2"><i class="bi bi-card-info"></i> 项目信息</h5>
+                        <div class="text-muted" style="font-size: 0.9rem; line-height: 1.6;">
+                            <p class="mb-1"><strong>版本：</strong>v1.0.0</p>
+                            <p class="mb-1"><strong>更新时间：</strong>2026-03-02</p>
+                            <p class="mb-1"><strong>适配规范：</strong>APA 7th 版</p>
+                            <p class="mb-1"><strong>gihub地址：
+                                <br></strong>https://github.com/k56b0/APACitationReedTool </p>
+                            <p class="mb-0"><strong>提示：</strong>仅供学习参考使用</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        
+
+            <div class="row col-lg-8 col-md-10  ms-md-n2">
+
+                <div class="row">
+                    <!-- 标题区域 -->
+                    <div class="text-center mb-5">
+                        <h2 class="text-primary fw-bold">APA格式引文生成工具</h2>
+                        <p class="text-muted">支持书籍、期刊、网页链接（含B站自动解析） | 格式符合APA 7th规范</p>
+                    </div>
+
+                    <!-- 引文类型切换 -->
+                    <div class="mb-4">
+                        <div class="btn-group w-100" role="group">
+                            <button 
+                                class="btn btn-outline-primary" 
+                                :class="{active: citationType === 'link'}"
+                                @click="citationType = 'link'"
+                            >
+                                <i class="bi bi-link-45deg"></i>链接
+                            </button>
+                            <button 
+                                class="btn btn-outline-primary" 
+                                :class="{active: citationType === 'book'}"
+                                @click="citationType = 'book'"
+                            >
+                                <i class="bi bi-book"></i>书籍
+                            </button>
+                            <button 
+                                class="btn btn-outline-primary" 
+                                :class="{active: citationType === 'journal'}"
+                                @click="citationType = 'journal'"
+                            >
+                                <i class="bi bi-newspaper"></i>期刊
+                            </button>
+                            
+                        </div>
+                    </div>
+
+                    <!-- 表单区域 -->
+                    <div class="card form-card mb-4">
+                        <div class="card-body p-4">
+                            <!-- 书籍表单 -->
+                            <div v-if="citationType === 'book'">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">作者 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.author"
+                                        placeholder="示例：张三, L., & 李四, W."
+                                        :class="{ 'is-invalid': submitFailed && !formData.author }"
+                                    >
+                                    <div class="invalid-feedback">请填写作者信息</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">出版年份 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.year"
+                                        placeholder="示例：2024 | 无年份 n.d."
+                                        :class="{ 'is-invalid': submitFailed && !formData.year }"
+                                    >
+                                    <div class="invalid-feedback">请填写出版年份</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">书籍标题 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.title"
+                                        placeholder="示例：Python编程：从入门到实践"
+                                        :class="{ 'is-invalid': submitFailed && !formData.title }"
+                                    >
+                                    <div class="invalid-feedback">请填写书籍标题</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">出版社 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.publisher"
+                                        placeholder="示例：人民邮电出版社"
+                                        :class="{ 'is-invalid': submitFailed && !formData.publisher }"
+                                    >
+                                    <div class="invalid-feedback">请填写出版社</div>
+                                </div>
+                            </div>
+
+                            <!-- 期刊表单 -->
+                            <div v-if="citationType === 'journal'">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">作者 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.author"
+                                        placeholder="示例：张三, L., & 李四, W."
+                                        :class="{ 'is-invalid': submitFailed && !formData.author }"
+                                    >
+                                    <div class="invalid-feedback">请填写作者信息</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">发表年份 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.year"
+                                        placeholder="示例：2024 | 无年份填 n.d."
+                                        :class="{ 'is-invalid': submitFailed && !formData.year }"
+                                    >
+                                    <div class="invalid-feedback">请填写发表年份</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">文章标题 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.title"
+                                        placeholder="示例：Python在数据分析中的应用研究"
+                                        :class="{ 'is-invalid': submitFailed && !formData.title }"
+                                    >
+                                    <div class="invalid-feedback">请填写文章标题</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">期刊名称 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.journal"
+                                        placeholder="示例：计算机工程与应用"
+                                        :class="{ 'is-invalid': submitFailed && !formData.journal }"
+                                    >
+                                    <div class="invalid-feedback">请填写期刊名称</div>
+                                </div>
+                            </div>
+
+                            <!-- 链接表单（新增B站解析按钮） -->
+                            <div v-if="citationType === 'link'">
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">链接地址 <span class="text-danger">*</span></label>
+                                    <div class="input-group">
+                                        <input 
+                                            type="url" 
+                                            class="form-control form-control-lg" 
+                                            v-model="formData.url"
+                                            placeholder="示例：https://www.baidu.com/"
+                                            :class="{ 'is-invalid': submitFailed && !formData.url }"
+                                        >
+                                        <!-- B站解析按钮 -->
+                                        <button 
+                                            class="btn btn-success btn-lg" 
+                                            @click="parseBilibili"
+                                            :disabled="parsingBilibili || !formData.url"
+                                            :class="{ loading: parsingBilibili }"
+                                        >
+                                            <i class="bi bi-bilibili" v-if="!parsingBilibili"></i>
+                                            <i class="bi bi-hourglass-split" v-if="parsingBilibili"></i>
+                                            <span v-if="!parsingBilibili">解析B站</span>
+                                            <span v-if="parsingBilibili">解析中...</span>
+                                        </button>
+                                    </div>
+                                    <div class="invalid-feedback">请填写有效的链接地址</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">作者 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.author"
+                                        placeholder="示例：张三, L. | 无作者填 未知作者"
+                                        :class="{ 'is-invalid': submitFailed && !formData.author }"
+                                    >
+                                    <div class="invalid-feedback">请填写作者信息</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">发布年份 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.year"
+                                        placeholder="示例：2024 | 默认n.d."
+                                        :class="{ 'is-invalid': submitFailed && !formData.year }"
+                                    >
+                                    <div class="invalid-feedback">请填写发布年份</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label class="form-label fw-semibold">页面/资源标题 <span class="text-danger">*</span></label>
+                                    <input 
+                                        type="text" 
+                                        class="form-control form-control-lg" 
+                                        v-model="formData.title"
+                                        placeholder="示例：B站视频：Python入门教程"
+                                        :class="{ 'is-invalid': submitFailed && !formData.title }"
+                                    >
+                                    <div class="invalid-feedback">请填写标题</div>
+                                </div>
+                            </div>
+
+                            <!-- 生成按钮 -->
+                            <button class="btn btn-primary btn-lg w-100" @click="generateAPA">
+                                <i class="bi bi-magic"></i>生成APA引文
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 生成结果区域 -->
+                    <div v-if="apaResult" class="mb-4">
+                        <label class="form-label fw-semibold mb-2">APA引文结果（APA 7th）</label>
+                        <div class="citation-result mb-3">
+                            {{ apaResult }}
+                        </div>
+                        <button 
+                            class="btn copy-btn btn-outline-primary w-100 py-2" 
+                            @click="copyResult"
+                            :disabled="copying"
+                        >
+                            <i class="bi bi-clipboard" v-if="!copied"></i>
+                            <i class="bi bi-clipboard-check" v-if="copied"></i>
+                            <span v-if="!copying && !copied">复制到剪贴板</span>
+                            <span v-if="copying">复制中...</span>
+                            <span v-if="copied">复制成功！</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        
+    </div>
+
+    <script>
+        const { createApp } = Vue;
+        createApp({
+            data() {
+                return {
+                    citationType: 'link',
+                    formData: {
+                        author: '',
+                        year: '',
+                        title: '',
+                        publisher: '',
+                        journal: '',
+                        url: ''
+                    },
+                    apaResult: '',
+                    submitFailed: false,
+                    copying: false,
+                    copied: false,
+                    parsingBilibili: false // B站解析加载状态
+                }
+            },
+            methods: {
+                // B站链接自动解析
+                async parseBilibili() {
+                    this.parsingBilibili = true;
+                    try {
+                        // 调用后端解析接口
+                        const response = await fetch(`/parse-bilibili?url=${encodeURIComponent(this.formData.url)}`);
+                        const data = await response.json();
+                        
+                        if (response.ok) {
+                            // 自动填充表单
+                            this.formData.author = data.author;
+                            this.formData.year = data.year;
+                            this.formData.title = data.title;
+                        } else {
+                            alert(`解析失败：${data.detail || '未知错误'}`);
+                        }
+                    } catch (err) {
+                        alert(`解析失败：${err.message}`);
+                    } finally {
+                        this.parsingBilibili = false;
+                    }
+                },
+                // 生成APA引文
+                generateAPA() {
+                    this.submitFailed = true;
+                    this.apaResult = '';
+                    this.copied = false;
+
+                    if (!this.formData.author || !this.formData.year || !this.formData.title) return;
+
+                    let apaStr = '';
+                    if (this.citationType === 'book') {
+                        if (!this.formData.publisher) return;
+                        apaStr = `${this.formData.author} (${this.formData.year}). *${this.formData.title}*. ${this.formData.publisher}.`;
+                    } else if (this.citationType === 'journal') {
+                        if (!this.formData.journal) return;
+                        apaStr = `${this.formData.author} (${this.formData.year}). ${this.formData.title}. *${this.formData.journal}*.`;
+                    } else if (this.citationType === 'link') {
+                        if (!this.formData.url) return;
+                        // B站链接特殊标注[Video]，普通链接标注[Web page]
+                        const linkType = this.formData.url.includes("bilibili.com") || this.formData.url.includes("b23.tv") 
+                            ? "[Video]" 
+                            : "[Web page]";
+                        apaStr = `${this.formData.author} (${this.formData.year}). ${this.formData.title} ${linkType}. ${this.formData.url}`;
+                    }
+
+                    this.apaResult = apaStr;
+                    this.submitFailed = false;
+                },
+                // 复制功能
+                async copyResult() {
+                    this.copying = true;
+                    this.copied = false;
+                    try {
+                        await navigator.clipboard.writeText(this.apaResult);
+                        this.copied = true;
+                        setTimeout(() => this.copied = false, 3000);
+                    } catch (err) {
+                        const textArea = document.createElement('textarea');
+                        textArea.value = this.apaResult;
+                        document.body.appendChild(textArea);
+                        textArea.select();
+                        document.execCommand('copy');
+                        document.body.removeChild(textArea);
+                        this.copied = true;
+                        setTimeout(() => this.copied = false, 3000);
+                    } finally {
+                        this.copying = false;
+                    }
+                }
+            }
+        
+
+        }).mount('#app');
+
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
